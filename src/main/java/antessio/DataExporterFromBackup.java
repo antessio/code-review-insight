@@ -2,6 +2,7 @@ package antessio;
 
 import static antessio.common.FileUtils.readFileAsString;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,6 +16,11 @@ public class DataExporterFromBackup implements CodeReviewDataExporter{
 
     public DataExporterFromBackup(String filename) {
         this.filename = filename;
+        this.jsonConverter = new ObjectMapperJsonConverter();
+        this.initFromBackup();
+    }
+    public DataExporterFromBackup(File file) {
+        this.filename = file.getAbsolutePath();
         this.jsonConverter = new ObjectMapperJsonConverter();
         this.initFromBackup();
     }

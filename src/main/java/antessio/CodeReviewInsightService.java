@@ -43,7 +43,6 @@ public class CodeReviewInsightService{
 
         mergeRequests
                 .forEach(mr -> {
-
                     // process comments
                     AtomicInteger commentCount = new AtomicInteger();
                     AtomicReference<Instant> firstComment = new AtomicReference<>(null);

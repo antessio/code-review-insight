@@ -4,6 +4,7 @@ import java.io.File;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 import antessio.gitlab.GitLabExporter;
 import antessio.gitlab.Gitlab;
@@ -14,18 +15,23 @@ import antessio.gitlab.Gitlab;
 public class App {
 
 
+    public static final String OUTPUT_FILE = "output/merge_requests.json";
+
     public static void main(String[] args) {
         String accessKey = System.getenv("gitlab.accesskey");
         List<String> team = Arrays.stream(System.getenv("team")
                 .split(","))
                 .toList();
         String gitlabHost = System.getenv("gitlab.host");
-        Gitlab gitlab = new Gitlab(accessKey, gitlabHost);
-        CodeReviewDataExporter gitLabExporter = new GitLabExporter(gitlab, team, 90, 1000, "output/merge_requests.json");
+        CodeReviewDataExporter exporter = Optional.of(OUTPUT_FILE)
+                                                  .map(File::new)
+                                                  .filter(File::exists)
+                                                  .map(DataExporterFromBackup::new)
+                                                  .map(CodeReviewDataExporter.class::cast)
+                                                  .orElseGet(() -> new GitLabExporter(new Gitlab(accessKey, gitlabHost), team, 90, 1000, OUTPUT_FILE));
 
-        CodeReviewDataExporter fromFileExporter = new DataExporterFromBackup("output/merge_requests.json");
 
-        CodeReviewInsightService codeReviewInsightService = new CodeReviewInsightService(fromFileExporter);
+        CodeReviewInsightService codeReviewInsightService = new CodeReviewInsightService(exporter);
 
         MarkdownReport markdownReport = new MarkdownReport(
                 new File("output/report_%s.md".formatted(Instant.now().toString())),

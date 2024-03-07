@@ -2,9 +2,6 @@ package antessio.gitlab;
 
 import static antessio.common.FileUtils.writeToFile;
 
-import java.io.BufferedWriter;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -13,11 +10,15 @@ import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import antessio.CodeReviewDataExporter;
 import antessio.common.JsonConverter;
 import antessio.common.ObjectMapperJsonConverter;
 
 public class GitLabExporter implements CodeReviewDataExporter {
+    private static final Logger LOGGER = LoggerFactory.getLogger(GitLabExporter.class);
 
     private final Gitlab gitlab;
     private final List<String> team;
@@ -46,6 +47,7 @@ public class GitLabExporter implements CodeReviewDataExporter {
     }
 
     public void init() {
+        LOGGER.debug("initialization started at {} ", clock.instant());
         Instant createdAfter = clock.instant().minus(durationInDays, ChronoUnit.DAYS);
 
         this.team.stream()
@@ -55,6 +57,7 @@ public class GitLabExporter implements CodeReviewDataExporter {
                  .flatMap(authorId -> gitlab.getMergedMergeRequestsStream(createdAfter, authorId))
                  .limit(size)
                  .forEach(mr -> {
+                     LOGGER.debug("processing mr {}", mr.getWebUrl());
                      List<Comment> comments = new ArrayList<>();
                      List<Approval> approvals = new ArrayList<>();
                      gitlab.getComments(mr)
@@ -62,8 +65,7 @@ public class GitLabExporter implements CodeReviewDataExporter {
                            .forEach(note -> comments.add(new Comment(note.getAuthor().getName(), note.getBody(), note.getCreatedAt().toInstant())));
 
                      gitlab.getApprovals(mr.getProjectId(), mr.getIid())
-                           .getApprovedBy()
-                           .forEach(approvedBy -> approvals.add(new Approval(approvedBy.getUser().getUsername())));
+                           .forEach(approvedBy -> approvals.add(new Approval(approvedBy.getUsername())));
 
                      mergeRequests.add(new MergeRequest(
                              mr.getIid(),
@@ -78,10 +80,11 @@ public class GitLabExporter implements CodeReviewDataExporter {
                      ));
 
                  });
-
         // backup
-        writeToFile(backupFile, jsonConverter.toJson(this.getMergeRequests()));
+        LOGGER.debug("storing backup to {} ", backupFile);
         initialized = true;
+        writeToFile(backupFile, jsonConverter.toJson(mergeRequests));
+        LOGGER.debug("initialization finished at {} ", clock.instant());
     }
 
 
