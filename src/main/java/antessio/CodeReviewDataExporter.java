@@ -7,6 +7,11 @@ public interface CodeReviewDataExporter {
 
     List<MergeRequest> getMergeRequests();
 
+
+    record Project(String id, String name, String url) {
+
+    }
+
     record Approval(String username) {
 
     }
@@ -15,7 +20,7 @@ public interface CodeReviewDataExporter {
 
     }
 
-    record MergeRequest(Long id,
+    record MergeRequest(String id,
                                String title,
                                String webUrl,
                                String author,
@@ -23,7 +28,8 @@ public interface CodeReviewDataExporter {
                                Instant mergedAt,
                                Integer changes,
                                List<Approval> approvals,
-                               List<Comment> comments) {
+                        List<Comment> comments,
+                        Project project) {
 
     }
 
