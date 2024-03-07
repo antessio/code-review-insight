@@ -28,7 +28,12 @@ public class App {
                                                   .filter(File::exists)
                                                   .map(DataExporterFromBackup::new)
                                                   .map(CodeReviewDataExporter.class::cast)
-                                                  .orElseGet(() -> new GitLabExporter(new Gitlab(accessKey, gitlabHost), team, 90, 1000, OUTPUT_FILE));
+                                                  .orElseGet(() -> new GitLabExporter(new Gitlab(accessKey, gitlabHost),
+                                                                                      team,
+                                                                                      90,
+                                                                                      1000,
+                                                                                      List.of("1389"),
+                                                                                      OUTPUT_FILE));
 
 
         CodeReviewInsightService codeReviewInsightService = new CodeReviewInsightService(exporter);

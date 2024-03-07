@@ -19,15 +19,16 @@ import antessio.gitlab.GitLabExporter;
 
 public class CodeReviewInsightService{
 
-    protected final List<Contributor> topContributors = new ArrayList<>();
-    protected final List<Commenter> topCommenters = new ArrayList<>();
-    protected final List<Approver> topApprovers = new ArrayList<>();
-    protected final List<HotMr> hottestMrs = new ArrayList<>();
-    protected final List<LongMr> longestMr = new ArrayList<>();
-    protected final List<BigMr> biggestMrs = new ArrayList<>();
-    protected final AtomicInteger averageMergeRequestsDurationInHours = new AtomicInteger(0);
-    protected final AtomicInteger averageTimeToFirstCommentInHours = new AtomicInteger(0);
-    protected final AtomicReference<Double> averageCountOfNitComments = new AtomicReference<Double>(0d);
+    private final List<Contributor> topContributors = new ArrayList<>();
+    private final List<Commenter> topCommenters = new ArrayList<>();
+    private final List<Approver> topApprovers = new ArrayList<>();
+    private final List<HotMr> hottestMrs = new ArrayList<>();
+    private final List<LongMr> longestMr = new ArrayList<>();
+    private final List<BigMr> biggestMrs = new ArrayList<>();
+    private final AtomicInteger averageMergeRequestsDurationInHours = new AtomicInteger(0);
+    private final AtomicInteger averageTimeToFirstCommentInHours = new AtomicInteger(0);
+    private final AtomicReference<Double> averageCountOfNitComments = new AtomicReference<Double>(0d);
+    
 
 
     public CodeReviewInsightService(CodeReviewDataExporter codeReviewDataExporter) {

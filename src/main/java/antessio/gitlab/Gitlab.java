@@ -17,6 +17,7 @@ import org.gitlab4j.api.models.AbstractUser;
 import org.gitlab4j.api.models.Discussion;
 import org.gitlab4j.api.models.MergeRequest;
 import org.gitlab4j.api.models.MergeRequestFilter;
+import org.gitlab4j.api.models.Project;
 import org.gitlab4j.api.models.User;
 
 public class Gitlab {
@@ -80,6 +81,14 @@ public class Gitlab {
                     mr.getProjectId(), mr.getIid(),
                     20
             ).stream();
+        } catch (GitLabApiException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public Project getProject(Long projectId) {
+        try {
+            return gitLabApi.getProjectApi().getProject(projectId);
         } catch (GitLabApiException e) {
             throw new RuntimeException(e);
         }
