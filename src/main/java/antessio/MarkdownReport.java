@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
@@ -14,6 +15,8 @@ import antessio.common.FileUtils;
 
 public class MarkdownReport {
 
+    public static final String NUMBER_OF_ANALYSED_MERGE_REQUESTS_PLACEHOLDER = "§number_of_analysed_merge_requests";
+    public static final String TARGET_DATE_FROM_PLACEHOLDER = "§target_date_from";
     private final File outputFile;
 
     private final static String CONTRIBUTOR_TABLE_PLACEHOLDER = "§contributors_table";
@@ -40,6 +43,8 @@ public class MarkdownReport {
     private final static String AVERAGE_DURATION_PLACEHOLDER = "§average_merge_requests_duration";
     private final static String AVERAGE_FIRST_COMMENT_DURATION_PLACEHOLDER = "§average_first_comment_duration";
     private final static String AVERAGE_NIT_COUNT_PLACEHOLDER = "§average_nit_count";
+
+    private final static String TIMES_FIRST_COMMENT_WAS_NIT_PLACEHOLDER = "§times_first_comment_was_nit";
     private final Supplier<List<CodeReviewInsightService.Approver>> topApprovers;
     private final Supplier<List<CodeReviewInsightService.HotMr>> hottestMrs;
     private final Supplier<List<CodeReviewInsightService.LongMr>> longestMrs;
@@ -47,28 +52,26 @@ public class MarkdownReport {
     private final Supplier<AtomicInteger> averageMergeRequestsDurationInHours;
     private final Supplier<AtomicInteger> averageTimeToFirstCommentInHours;
     private final Supplier<AtomicReference<Double>> countNitComments;
+    private final Supplier<AtomicLong> getTimesFirstCommentWasNit;
+    private final CodeReviewInsightService codeReviewInsightService;
     private Supplier<List<CodeReviewInsightService.Commenter>> topCommenters;
     private Supplier<List<CodeReviewInsightService.Contributor>> topContributors;
 
     public MarkdownReport(
             File outputFile,
-            Supplier<List<CodeReviewInsightService.Commenter>> getTopCommenters,
-            Supplier<List<CodeReviewInsightService.Contributor>> getTopContributors,
-            Supplier<List<CodeReviewInsightService.Approver>> getTopApprovers,
-            Supplier<List<CodeReviewInsightService.HotMr>> getHottestMrs, Supplier<List<CodeReviewInsightService.LongMr>> getLongestMrs,
-            Supplier<List<CodeReviewInsightService.BigMr>> getBiggestMRs, Supplier<AtomicInteger> getAverageMergeRequestsDurationInHours,
-            Supplier<AtomicInteger> getAverageTimeToFirstCommentInHours,
-            Supplier<AtomicReference<Double>> getCountNitComments) {
+            CodeReviewInsightService codeReviewInsightService) {
         this.outputFile = outputFile;
-        topCommenters = getTopCommenters;
-        topContributors = getTopContributors;
-        topApprovers = getTopApprovers;
-        hottestMrs = getHottestMrs;
-        longestMrs = getLongestMrs;
-        biggestMrs = getBiggestMRs;
-        averageMergeRequestsDurationInHours = getAverageMergeRequestsDurationInHours;
-        averageTimeToFirstCommentInHours = getAverageTimeToFirstCommentInHours;
-        countNitComments  = getCountNitComments;
+        topCommenters = codeReviewInsightService::getTopCommenters;
+        topContributors = codeReviewInsightService::getTopContributors;
+        topApprovers = codeReviewInsightService::getTopApprovers;
+        hottestMrs = codeReviewInsightService::getHottestMrs;
+        longestMrs = codeReviewInsightService::getLongestMrs;
+        biggestMrs = codeReviewInsightService::getBiggestMRs;
+        averageMergeRequestsDurationInHours = codeReviewInsightService::getAverageMergeRequestsDurationInHours;
+        averageTimeToFirstCommentInHours = codeReviewInsightService::getAverageTimeToFirstCommentInHours;
+        countNitComments  = codeReviewInsightService::getCountNitComments;
+        getTimesFirstCommentWasNit = codeReviewInsightService::getTimesFirstCommentWasNit;
+        this.codeReviewInsightService = codeReviewInsightService;
     }
 
 
@@ -148,7 +151,16 @@ public class MarkdownReport {
                         averageTimeToFirstCommentInHours.get().toString())
                 .replace(
                         AVERAGE_NIT_COUNT_PLACEHOLDER,
-                        countNitComments.get().toString());
+                        countNitComments.get().toString())
+                .replace(TIMES_FIRST_COMMENT_WAS_NIT_PLACEHOLDER,
+                         getTimesFirstCommentWasNit.get().toString())
+                .replace(
+                        NUMBER_OF_ANALYSED_MERGE_REQUESTS_PLACEHOLDER,
+                         codeReviewInsightService.mergeRequestsCount()+"")
+                .replace(
+                        TARGET_DATE_FROM_PLACEHOLDER,
+                        codeReviewInsightService.mergeRequestsFrom().toString())
+                ;
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile))) {
             writer.write(report);
         } catch (IOException e) {

@@ -1,9 +1,5 @@
 package antessio.gitlab;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
 import java.util.List;
@@ -38,7 +34,7 @@ public class Gitlab {
         }
 
     }
-    public Stream<MergeRequest> getMergedMergeRequestsStream(Instant from, Long userId) {
+    public Stream<MergeRequest> getMergedMergeRequestsStream(Instant from, Instant to, Long userId) {
 
         try {
 
@@ -47,6 +43,7 @@ public class Gitlab {
                                               .withAuthorId(userId)
                                               .withState(Constants.MergeRequestState.MERGED)
                                               .withCreatedAfter(Date.from(from))
+                                              .withCreatedBefore(Date.from(to))
                                               .withOrderBy(Constants.MergeRequestOrderBy.CREATED_AT)
                                               .withSort(Constants.SortOrder.DESC)
                                               .withScope(Constants.MergeRequestScope.ALL),

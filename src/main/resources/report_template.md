@@ -11,6 +11,7 @@ Merge Requests:
 - Hottest merge requests: merge requests with a lot of comments
 - Longest merge requests: merge requests with long duration
 
+
 ## Contributors
 
 ### Top Contributors
@@ -41,8 +42,12 @@ Merge Requests:
 
 ### Merge Requests data
 
+Merge requests analysed §number_of_analysed_merge_requests  from §target_date_from
+
 Average duration: §average_merge_requests_duration minutes
 
 Average first comment duration: §average_first_comment_duration minutes
 
 Average NIT count: §average_nit_count
+
+Times first comment was a NIT: §times_first_comment_was_nit

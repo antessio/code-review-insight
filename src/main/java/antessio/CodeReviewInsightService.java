@@ -2,6 +2,7 @@ package antessio;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -9,6 +10,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -28,14 +30,17 @@ public class CodeReviewInsightService{
     private final AtomicInteger averageMergeRequestsDurationInHours = new AtomicInteger(0);
     private final AtomicInteger averageTimeToFirstCommentInHours = new AtomicInteger(0);
     private final AtomicReference<Double> averageCountOfNitComments = new AtomicReference<Double>(0d);
-    
+
+    private final AtomicLong timesFirstCommentWasNit = new AtomicLong(0);
+    private final List<CodeReviewDataExporter.MergeRequest> mergeRequests;
 
 
     public CodeReviewInsightService(CodeReviewDataExporter codeReviewDataExporter) {
-        init(codeReviewDataExporter.getMergeRequests());
+        mergeRequests = codeReviewDataExporter.getMergeRequests();
+        init();
     }
 
-    private void init(List<GitLabExporter.MergeRequest> mergeRequests) {
+    private void init() {
         Map<String, List<GitLabExporter.MergeRequest>> approvedMRByUser = new HashMap<>();
         Map<String, Map<GitLabExporter.MergeRequest, List<GitLabExporter.Comment>>> discussionsOnMRByUser = new HashMap<>();
         Map<GitLabExporter.MergeRequest, Integer> firstCommentByMergeRequest = new HashMap<>();
@@ -46,10 +51,13 @@ public class CodeReviewInsightService{
                 .forEach(mr -> {
                     // process comments
                     AtomicInteger commentCount = new AtomicInteger();
-                    AtomicReference<Instant> firstComment = new AtomicReference<>(null);
                     nitByMergeRequest.put(mr, 0);
+                    AtomicReference<CodeReviewDataExporter.Comment> firstComment = new AtomicReference<>(null);
+                    Map<String, CodeReviewDataExporter.Comment> firstCommentByAuthor = new HashMap<>();
                     mr
                             .comments()
+                            .stream()
+                            .sorted(Comparator.comparing(CodeReviewDataExporter.Comment::createdAt))
                             .forEach(n -> {
                                 commentCount.addAndGet(1);
                                 String commentAuthor = n.author();
@@ -68,25 +76,34 @@ public class CodeReviewInsightService{
                                         .add(n);
 
                                 Instant commentDate = n.createdAt();
-                                if (firstComment.get() == null || firstComment.get().isAfter(commentDate)) {
-                                    firstComment.set(commentDate);
+                                if (!firstCommentByAuthor.containsKey(n.author())) {
+                                    firstCommentByAuthor.put(n.author(), n);
                                 }
-                                if (n.body().contains("NIT") || n.body().contains("nit")) {
+                                if (firstComment.get() == null || firstComment.get().createdAt().isAfter(commentDate)) {
+                                    firstComment.set(n);
+                                }
+                                if (isNitComment(n)) {
                                     int newCount = nitByMergeRequest.get(mr) + 1;
                                     nitByMergeRequest.put(mr, newCount);
                                 }
 
 
                             });
-                    int firstCommentDuration = DateUtils.timeDiff(Date.from(firstComment.get()), Date.from(mr.createdAt()), TimeUnit.MINUTES);
-                    firstCommentByMergeRequest.put(mr, firstCommentDuration);
+                    if (firstComment.get()!=null) {
+                        int firstCommentDuration = DateUtils.timeDiff(Date.from(firstComment.get().createdAt()), Date.from(mr.createdAt()), TimeUnit.MINUTES);
+                        firstCommentByMergeRequest.put(mr, firstCommentDuration);
+                    }
+                    timesFirstCommentWasNit.addAndGet(firstCommentByAuthor.values()
+                                                                    .stream()
+                                                                    .filter(CodeReviewInsightService::isNitComment)
+                                                                    .count());
                     // process mr data
-                    hottestMrs.add(new HotMr(mr.id().toString(), mr.title(), mr.author(), commentCount.get(), mr.webUrl()));
-                    biggestMrs.add(new BigMr(mr.id().toString(), mr.title(), mr.author(), mr.changes(), mr.webUrl()));
+                    hottestMrs.add(new HotMr(mr.id(), mr.title(), mr.author(), commentCount.get(), mr.webUrl()));
+                    biggestMrs.add(new BigMr(mr.id(), mr.title(), mr.author(), mr.changes(), mr.webUrl()));
                     Optional.ofNullable(mr.mergedAt())
                             .ifPresent(mergedAt -> {
                                 int mrDuration = DateUtils.timeDiff(Date.from(mergedAt), Date.from(mr.createdAt()), TimeUnit.MINUTES);
-                                longestMr.add(new LongMr(mr.id().toString(), mr.title(), mr.author(), mrDuration, mr.webUrl()));
+                                longestMr.add(new LongMr(mr.id(), mr.title(), mr.author(), mrDuration, mr.webUrl()));
                                 durationInHoursByMergeRequest.put(mr, mrDuration);
                             });
                     updateApprovalsIfApproved(mr, approvedMRByUser);
@@ -98,6 +115,10 @@ public class CodeReviewInsightService{
         calculateTopContributors(approvedMRByUser, discussionsOnMRByUser);
         calculateTopApprovers(approvedMRByUser);
         calculateTopCommenters(discussionsOnMRByUser);
+    }
+
+    private static boolean isNitComment(CodeReviewDataExporter.Comment n) {
+        return n.body().contains("NIT");
     }
 
 
@@ -183,6 +204,17 @@ public class CodeReviewInsightService{
 
     public AtomicReference<Double> getCountNitComments() {
         return averageCountOfNitComments;
+    }
+
+    public AtomicLong getTimesFirstCommentWasNit() {
+        return timesFirstCommentWasNit;
+    }
+
+    public int mergeRequestsCount(){
+        return this.mergeRequests.size();
+    }
+    public Instant mergeRequestsFrom(){
+        return this.mergeRequests.stream().map(CodeReviewDataExporter.MergeRequest::createdAt).min(Comparator.naturalOrder()).orElse(null);
     }
 
     public record Contributor(String name, Long contributes) {

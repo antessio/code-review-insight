@@ -3,6 +3,7 @@ package antessio.gitlab;
 import static antessio.common.FileUtils.writeToFile;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -32,33 +33,60 @@ public class GitLabExporter implements CodeReviewDataExporter {
     private final List<MergeRequest> mergeRequests;
     private boolean initialized = false;
 
+    private final Instant from;
+    private final Instant to;
+
     public GitLabExporter(
             Gitlab gitlab,
             List<String> team,
             int durationInDays,
             int size,
             List<String> blackListProjectsId,
-            String backupFile) {
+            String backupFile,
+            Clock clock) {
         this.gitlab = gitlab;
         this.team = team;
         this.durationInDays = durationInDays;
         this.size = size;
         this.blackListProjectsIds = blackListProjectsId;
-        this.clock = Clock.systemUTC();
+        this.clock = clock;
         this.backupFile = backupFile;
         this.mergeRequests = new ArrayList<>();
         this.jsonConverter = new ObjectMapperJsonConverter();
+        this.to = this.clock.instant();
+        this.from = to.minus(durationInDays, ChronoUnit.DAYS);
+    }
+    public GitLabExporter(
+            Gitlab gitlab,
+            List<String> team,
+            int size,
+            List<String> blackListProjectsId,
+            String backupFile,
+            Instant from,
+            Instant to,
+            Clock clock) {
+        this.gitlab = gitlab;
+        this.team = team;
+        this.durationInDays = Math.toIntExact(Duration.between(from, to).toDays());
+        this.size = size;
+        this.blackListProjectsIds = blackListProjectsId;
+        this.clock = clock;
+        this.backupFile = backupFile;
+        this.mergeRequests = new ArrayList<>();
+        this.jsonConverter = new ObjectMapperJsonConverter();
+        this.from = from;
+        this.to = to;
     }
 
     public void init() {
-        LOGGER.debug("initialization started at {} ", clock.instant());
-        Instant createdAfter = clock.instant().minus(durationInDays, ChronoUnit.DAYS);
+        Instant now = clock.instant();
+        LOGGER.debug("initialization started at {} ", now);
         java.util.Map<Long, org.gitlab4j.api.models.Project> projectMap = new HashMap<>();
         this.team.stream()
                  .map(gitlab::getAuthorId)
                  .filter(Optional::isPresent)
                  .map(Optional::get)
-                 .flatMap(authorId -> gitlab.getMergedMergeRequestsStream(createdAfter, authorId))
+                 .flatMap(authorId -> gitlab.getMergedMergeRequestsStream(from, to, authorId))
                  .filter(mr -> !blackListProjectsIds.contains(mr.getProjectId().toString()))
                  .limit(size)
                  .forEach(mr -> {
@@ -68,6 +96,7 @@ public class GitLabExporter implements CodeReviewDataExporter {
                      gitlab.getComments(mr)
                            .flatMap(comment -> comment.getNotes().stream())
                              .filter(comment -> team.contains(comment.getAuthor().getUsername()))
+                             .filter(comment -> !comment.getSystem())
                            .forEach(note -> comments.add(new Comment(note.getAuthor().getUsername(), note.getBody(), note.getCreatedAt().toInstant())));
 
                      gitlab.getApprovals(mr.getProjectId(), mr.getIid())
@@ -98,7 +127,7 @@ public class GitLabExporter implements CodeReviewDataExporter {
         LOGGER.debug("storing backup to {} ", backupFile);
         initialized = true;
         writeToFile(backupFile, jsonConverter.toJson(mergeRequests));
-        LOGGER.debug("initialization finished at {} ", clock.instant());
+        LOGGER.debug("initialization finished at {} ", now);
     }
 
     private static Project convertFromGitlabProject(org.gitlab4j.api.models.Project p) {
@@ -114,6 +143,12 @@ public class GitLabExporter implements CodeReviewDataExporter {
         return mergeRequests;
     }
 
+    public Instant getFrom() {
+        return from;
+    }
 
+    public Instant getTo() {
+        return to;
+    }
 
 }
